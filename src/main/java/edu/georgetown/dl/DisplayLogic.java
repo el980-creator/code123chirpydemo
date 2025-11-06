@@ -39,7 +39,7 @@ public class DisplayLogic {
         cfg.setFallbackOnNullLoopVariable(false);
         cfg.setSQLDateAndTimeTimeZone(TimeZone.getDefault());
 
-        this.logger.info("Disply logic initialized");
+        this.logger.info("Display logic initialized");
     }
 
     /**
@@ -122,7 +122,8 @@ public class DisplayLogic {
      */
     public boolean addCookie(HttpExchange exchange, String var, String val) {
         try {
-            exchange.getResponseHeaders().set("Set-Cookie",
+            // Use add so multiple Set-Cookie headers may be sent in one response
+            exchange.getResponseHeaders().add("Set-Cookie",
                     var + "=" + URLEncoder.encode(val, "UTF-8") + "; path=/");
         } catch (UnsupportedEncodingException e) {
             logger.warning("UnsupportedEncodingException: " + e.getMessage());
@@ -148,13 +149,19 @@ public class DisplayLogic {
         for (String cookieStr : cookieList) {
             String[] cookiesStr = cookieStr.split(";");
             for (String cookie : cookiesStr) {
-                String[] parts = cookie.split("=");
-                    try {
-                        cookies.put(parts[0].trim(), URLDecoder.decode(parts[1], "UTF-8"));
-                    } catch (UnsupportedEncodingException e) {
-                        logger.warning("UnsupportedEncodingException: " + e.getMessage());
-                        return null;
-                    }
+                // split into key/value pair at most once.
+                String[] parts = cookie.split("=", 2);
+                if (parts.length < 2) {
+                    // malformed cookie fragment; skip it
+                    continue;
+                }
+                try {
+                    cookies.put(parts[0].trim(), URLDecoder.decode(parts[1].trim(), "UTF-8"));
+                } catch (UnsupportedEncodingException e) {
+                    // log and continue parsing other cookies; do not return null
+                    logger.warning("UnsupportedEncodingException decoding cookie: " + e.getMessage());
+                    continue;
+                }
              }
         }
         return cookies;
